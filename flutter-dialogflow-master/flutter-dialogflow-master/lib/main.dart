@@ -1038,7 +1038,7 @@ class ChatInputWidget extends StatelessWidget {
           Expanded(
             child: TextField(
               controller: controller,
-              decoration: InputDecoration(hintText: "Type  message..."),
+              decoration: InputDecoration(hintText: "Type a message..."),
               onSubmitted: (text) {
                 if (text.isNotEmpty) {
                   sendMessage(text);
