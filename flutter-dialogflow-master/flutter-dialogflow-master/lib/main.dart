@@ -1,29 +1,110 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:dialog_flowtter/dialog_flowtter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import 'dart:io';
+
+class AuthProvider with ChangeNotifier {
+  bool _isLoggedIn = false;
+
+  bool get isLoggedIn => _isLoggedIn;
+
+  void login() {
+    _isLoggedIn = true;
+    notifyListeners();
+  }
+
+  void logout() {
+    _isLoggedIn = false;
+    notifyListeners();
+  }
+}
+
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => UserProfile()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+      ],
+      child: MyApp(),
+    ),
+  );
+}
+
+class ThemeProvider with ChangeNotifier {
+  ThemeMode _themeMode = ThemeMode.light;
+  ThemeMode get themeMode => _themeMode;
+
+  void toggleTheme(bool isDark) {
+    _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
+    notifyListeners();
+  }
+}
+
+class UserProfile with ChangeNotifier {
+  File? _profileImage;
+  String? _name = "User";
+  String? _email = "user@medbot.com";
+  String? _bio = "Health enthusiast";
+
+  File? get profileImage => _profileImage;
+  String? get name => _name;
+  String? get email => _email;
+  String? get bio => _bio;
+
+  void updateProfile({
+    File? image,
+    String? name,
+    String? email,
+    String? bio,
+  }) {
+    _profileImage = image ?? _profileImage;
+    _name = name ?? _name;
+    _email = email ?? _email;
+    _bio = bio ?? _bio;
+    notifyListeners();
+  }
 }
 
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Medbot',
-      theme: ThemeData(
-        brightness: Brightness.light,
-        primarySwatch: Colors.deepPurple,
-        fontFamily: 'Roboto',
-        scaffoldBackgroundColor: Colors.white,
-      ),
-      home: HomePage(),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, _) {
+        return MaterialApp(
+          title: 'Medbot',
+          theme: ThemeData.light().copyWith(
+            primaryColor: Colors.deepPurple,
+            colorScheme: ColorScheme.fromSwatch(
+              primarySwatch: Colors.deepPurple,
+            ),
+            scaffoldBackgroundColor: Colors.white,
+          ),
+          darkTheme: ThemeData.dark().copyWith(
+            colorScheme: ColorScheme.dark(
+              primary: Colors.deepPurple,
+              secondary: Colors.purpleAccent,
+            ),
+            scaffoldBackgroundColor: Colors.grey[900],
+          ),
+          themeMode: themeProvider.themeMode,
+          initialRoute: '/login',
+          routes: {
+            '/login': (context) => LoginPage(),
+            '/signup': (context) => SignupPage(),
+            '/home': (context) => HomePage(),
+          },
+        );
+      },
     );
   }
 }
 
-// Home Page with Sidebar Navigation
 class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -44,7 +125,7 @@ class HomePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildWelcomeHeader(),
+              _buildWelcomeHeader(context),
               SizedBox(height: 30),
               _buildHealthGrid(context),
               SizedBox(height: 20),
@@ -59,17 +140,21 @@ class HomePage extends StatelessWidget {
         onPressed: () => Navigator.push(context, 
             MaterialPageRoute(builder: (context) => ChatBotPage())),
         child: Icon(Icons.chat, color: Colors.white),
-        backgroundColor: Colors.deepPurple,
+        backgroundColor: Theme.of(context).colorScheme.primary,
       ),
     );
   }
 
-  Widget _buildWelcomeHeader() {
+  Widget _buildWelcomeHeader(BuildContext context) {
+    final user = Provider.of<UserProfile>(context);
     return Container(
       padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.deepPurple.shade300, Colors.purple.shade200],
+          colors: [
+            Theme.of(context).colorScheme.primary,
+            Theme.of(context).colorScheme.secondary,
+          ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -81,7 +166,7 @@ class HomePage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Welcome Back!",
+                Text("Welcome ${user.name}!",
                     style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -92,11 +177,18 @@ class HomePage extends StatelessWidget {
               ],
             ),
           ),
-          // Placeholder for profile/avatar
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.white24,
-            child: Icon(Icons.person, size: 30, color: Colors.white),
+          GestureDetector(
+            onTap: () => Navigator.push(context, 
+                MaterialPageRoute(builder: (context) => ProfilePage())),
+            child: CircleAvatar(
+              radius: 30,
+              backgroundImage: user.profileImage != null 
+                  ? FileImage(user.profileImage!) 
+                  : null,
+              child: user.profileImage == null 
+                  ? Icon(Icons.person, size: 30, color: Colors.white)
+                  : null,
+            ),
           )
         ],
       ),
@@ -136,9 +228,9 @@ class HomePage extends StatelessWidget {
       physics: NeverScrollableScrollPhysics(),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 0.75,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 1.0,
       ),
       itemCount: features.length,
       itemBuilder: (context, index) => _buildFeatureCard(features[index], context),
@@ -148,39 +240,39 @@ class HomePage extends StatelessWidget {
   Widget _buildFeatureCard(Map<String, dynamic> feature, BuildContext context) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(12),
         onTap: () => Navigator.push(
             context, MaterialPageRoute(builder: (context) => feature["page"])),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(15),
+            borderRadius: BorderRadius.circular(12),
             gradient: LinearGradient(
-              colors: [feature["color"].withOpacity(0.2), Colors.white],
+              colors: [feature["color"].withOpacity(0.1), Colors.white],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
           ),
           child: Padding(
-            padding: EdgeInsets.all(10),
+            padding: EdgeInsets.all(8),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                Icon(feature["icon"], size: 35, color: feature["color"]),
+                Icon(feature["icon"], size: 30, color: feature["color"]),
                 Text(feature["title"],
                     style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 13,
                         fontWeight: FontWeight.bold,
                         color: Colors.deepPurple)),
                 // Image placeholder
                 Container(
-                  height: 80,
+                  height: 60,
                   decoration: BoxDecoration(
                     color: feature["color"].withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(Icons.image, color: feature["color"].withOpacity(0.4)),
+                  child: Icon(Icons.image,size: 30, color: feature["color"].withOpacity(0.4)),
                 )
               ],
             ),
@@ -219,23 +311,24 @@ class HomePage extends StatelessWidget {
     return Card(
       elevation: 4,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         onTap: () {},
         child: Container(
-          height: 120,
+          height: 100,
           decoration: BoxDecoration(
             color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
           ),
-          padding: EdgeInsets.all(15),
+          padding: EdgeInsets.all(12),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 35, color: color),
-              SizedBox(height: 8),
+              Icon(icon, size: 30, color: color),
+              SizedBox(height: 6),
               Text(title,
                   textAlign: TextAlign.center,
                   style: TextStyle(
+                    fontSize: 13,
                       fontWeight: FontWeight.bold,
                       color: color)),
             ],
@@ -278,25 +371,341 @@ class HomePage extends StatelessWidget {
   }
 }
 
+// Add new LoginPage class
+class LoginPage extends StatefulWidget {
+  @override
+  _LoginPageState createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
+
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+    
+    // Simulate API call
+    await Future.delayed(Duration(seconds: 2));
+
+    context.read<AuthProvider>().login();
+    Navigator.pushReplacementNamed(context, '/home');
+
+    setState(() => _isLoading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.deepPurple.shade300,
+              Colors.purple.shade200
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(20),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 400),
+              child: Card(
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),),
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.health_and_safety, 
+                            size: 50, 
+                            color: Colors.deepPurple),
+                        SizedBox(height: 15),
+                        Text('Medbot Login',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.deepPurple)),
+                        SizedBox(height: 25),
+                        TextFormField(
+                          controller: _emailController,
+                          decoration: InputDecoration(
+                            labelText: 'Email',
+                            prefixIcon: Icon(Icons.email, size: 20),
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 15),
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value!.isEmpty) return 'Please enter email';
+                            if (!value.contains('@')) return 'Invalid email';
+                            return null;
+                          },
+                        ),
+                        SizedBox(height: 15),
+                        TextFormField(
+                          controller: _passwordController,
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            prefixIcon: Icon(Icons.lock, size: 20),
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 15),
+                          ),
+                          obscureText: true,
+                          validator: (value) {
+                            if (value!.isEmpty) return 'Please enter password';
+                            if (value.length < 6) return 'Minimum 6 characters';
+                            return null;
+                          },
+                        ),
+                        SizedBox(height: 25),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _handleLogin,
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              backgroundColor: Colors.deepPurple,
+                            ),
+                            child: _isLoading 
+                                ? CircularProgressIndicator(color: Colors.white)
+                                : Text('LOGIN', 
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      color: Colors.white)),
+                          ),
+                        ),
+                        SizedBox(height: 15),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pushNamed(context, '/signup');
+                          },
+                          child: Text('Create new account',
+                              style: TextStyle(
+                                color: Colors.deepPurple,
+                                fontSize: 14)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Add new SignupPage class
+class SignupPage extends StatefulWidget {
+  @override
+  _SignupPageState createState() => _SignupPageState();
+}
+
+class _SignupPageState extends State<SignupPage> {
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+  bool _isLoading = false;
+
+  Future<void> _handleSignup() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+    
+    // Simulate API call
+    await Future.delayed(Duration(seconds: 2));
+
+    context.read<AuthProvider>().login();
+    Navigator.pushReplacementNamed(context, '/home');
+
+    setState(() => _isLoading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.deepPurple.shade300,
+              Colors.purple.shade200
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(20),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 400),
+              child: Card(
+                elevation: 8,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.health_and_safety, 
+                            size: 50, 
+                            color: Colors.deepPurple),
+                        SizedBox(height: 15),
+                        Text('Create Account',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.deepPurple)),
+                        SizedBox(height: 25),
+                        TextFormField(
+                          controller: _nameController,
+                          decoration: InputDecoration(
+                            labelText: 'Full Name',
+                            prefixIcon: Icon(Icons.person, size: 20),
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 15),
+                          ),
+                          validator: (value) {
+                            if (value!.isEmpty) return 'Please enter your name';
+                            return null;
+                          },
+                        ),
+                        SizedBox(height: 15),
+                        TextFormField(
+                          controller: _emailController,
+                          decoration: InputDecoration(
+                            labelText: 'Email',
+                            prefixIcon: Icon(Icons.email, size: 20),
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 15),
+                          ),
+                          keyboardType: TextInputType.emailAddress,
+                          validator: (value) {
+                            if (value!.isEmpty) return 'Please enter email';
+                            if (!value.contains('@')) return 'Invalid email';
+                            return null;
+                          },
+                        ),
+                        SizedBox(height: 15),
+                        TextFormField(
+                          controller: _passwordController,
+                          decoration: InputDecoration(
+                            labelText: 'Password',
+                            prefixIcon: Icon(Icons.lock, size: 20),
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 15),
+                          ),
+                          obscureText: true,
+                          validator: (value) {
+                            if (value!.isEmpty) return 'Please enter password';
+                            if (value.length < 6) return 'Minimum 6 characters';
+                            return null;
+                          },
+                        ),
+                        SizedBox(height: 15),
+                        TextFormField(
+                          controller: _confirmPasswordController,
+                          decoration: InputDecoration(
+                            labelText: 'Confirm Password',
+                            prefixIcon: Icon(Icons.lock_outline, size: 20),
+                            border: OutlineInputBorder(),
+                            contentPadding: EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 15),
+                          ),
+                          obscureText: true,
+                          validator: (value) {
+                            if (value != _passwordController.text) {
+                              return 'Passwords do not match';
+                            }
+                            return null;
+                          },
+                        ),
+                        SizedBox(height: 25),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _handleSignup,
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              backgroundColor: Colors.deepPurple,
+                            ),
+                            child: _isLoading 
+                                ? CircularProgressIndicator(color: Colors.white)
+                                : Text('SIGN UP', 
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      color: Colors.white)),
+                          ),
+                        ),
+                        SizedBox(height: 15),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          child: Text('Already have an account? Login',
+                              style: TextStyle(
+                                color: Colors.deepPurple,
+                                fontSize: 14)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 // Sidebar Drawer
 class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final user = Provider.of<UserProfile>(context);
     return Drawer(
-      backgroundColor: Colors.deepPurple.shade300,
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          DrawerHeader(
-            decoration: BoxDecoration(color: Colors.deepPurple.shade700),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.health_and_safety, size: 50, color: Colors.white),
-                SizedBox(height: 10),
-                Text("Medbot Features",
-                    style: TextStyle(color: Colors.white, fontSize: 20)),
-              ],
+          UserAccountsDrawerHeader(
+            accountName: Text(user.name!),
+            accountEmail: Text(user.email!),
+            currentAccountPicture: CircleAvatar(
+              backgroundImage: user.profileImage != null 
+                  ? FileImage(user.profileImage!) 
+                  : null,
+              child: user.profileImage == null 
+                  ? Icon(Icons.person, size: 40, color: Colors.white)
+                  : null,
+            ),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
           FeatureItem("🩺 Disease Diagnosis", Icons.local_hospital,
@@ -305,22 +714,202 @@ class AppDrawer extends StatelessWidget {
               context),
           FeatureItem("😊 Mood Detection", Icons.mood, MoodDetectionPage(), context),
           FeatureItem("🤖 AI Medical Chatbot", Icons.smart_toy, ChatBotPage(), context),
+          Divider(),
+           ListTile(
+            leading: Icon(Icons.settings),
+            title: Text('Settings'),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (context) => SettingsPage())),),
+          ListTile(
+            leading: Icon(Icons.logout),
+            title: Text('Logout'),
+            onTap: () {
+              context.read<AuthProvider>().logout();
+              Navigator.pushReplacementNamed(context, '/login');
+            },
+          ),
         ],
       ),
     );
   }
+}
 
-  Widget FeatureItem(String title, IconData icon, Widget page, BuildContext context) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.white),
-      title: Text(title, style: TextStyle(color: Colors.white)),
-      onTap: () {
-        Navigator.pop(context);
-        Navigator.push(context, MaterialPageRoute(builder: (context) => page));
-      },
+Widget FeatureItem(String title, IconData icon, Widget page, BuildContext context) {
+  return ListTile(
+    leading: Icon(icon, color: Theme.of(context).colorScheme.onSurface),
+    title: Text(title),
+    onTap: () {
+      Navigator.pop(context);
+      Navigator.push(context, MaterialPageRoute(builder: (context) => page));
+    },
+  );
+}
+
+class SettingsPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    return Scaffold(
+      appBar: AppBar(title: Text('Settings')),
+      body: ListView(
+        children: [
+          SwitchListTile(
+            title: Text('Dark Mode'),
+            value: themeProvider.themeMode == ThemeMode.dark,
+            onChanged: (value) => themeProvider.toggleTheme(value),
+          ),
+          ListTile(
+            leading: Icon(Icons.person),
+            title: Text('Profile Settings'),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (context) => ProfilePage())),
+          ),
+          ListTile(
+            leading: Icon(Icons.info),
+            title: Text('About'),
+            onTap: () => Navigator.push(context,
+                MaterialPageRoute(builder: (context) => AboutPage())),
+          ),
+        ],
+      ),
     );
   }
 }
+
+class AboutPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('About')),
+      body: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Medbot', style: Theme.of(context).textTheme.headlineSmall),
+            SizedBox(height: 20),
+            Text(
+              'A comprehensive health companion app providing various medical '
+              'features including symptom checking, women health tracking, '
+              'mood detection, and AI-powered medical assistance.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            SizedBox(height: 30),
+            Text('Developers:', style: Theme.of(context).textTheme.titleMedium),
+            SizedBox(height: 10),
+            Text('• Benson B Varghese'),
+            Text('• Bhavana S Nair'),
+            Text('• Aswin Baburaj'),
+            Text('• Adithyakrishnan K H'),
+            SizedBox(height: 30),
+            Text('Version: 1.0.0', style: Theme.of(context).textTheme.bodySmall),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class ProfilePage extends StatefulWidget {
+  @override
+  _ProfilePageState createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  late TextEditingController _nameController;
+  late TextEditingController _emailController;
+  late TextEditingController _bioController;
+  File? _selectedImage;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = Provider.of<UserProfile>(context, listen: false);
+    _nameController = TextEditingController(text: user.name);
+    _emailController = TextEditingController(text: user.email);
+    _bioController = TextEditingController(text: user.bio);
+    _selectedImage = user.profileImage;
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() => _selectedImage = File(pickedFile.path));
+    }
+  }
+
+  void _saveProfile() {
+    Provider.of<UserProfile>(context, listen: false).updateProfile(
+      image: _selectedImage,
+      name: _nameController.text,
+      email: _emailController.text,
+      bio: _bioController.text,
+    );
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Profile'),
+        actions: [
+          IconButton(icon: Icon(Icons.save), onPressed: _saveProfile),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          children: [
+            GestureDetector(
+              onTap: _pickImage,
+              child: CircleAvatar(
+                radius: 50,
+                backgroundImage: _selectedImage != null
+                    ? FileImage(_selectedImage!)
+                    : null,
+                child: _selectedImage == null
+                    ? Icon(Icons.camera_alt, size: 40)
+                    : null,
+              ),
+            ),
+            SizedBox(height: 20),
+            TextFormField(
+              controller: _nameController,
+              decoration: InputDecoration(
+                labelText: 'Name',
+                prefixIcon: Icon(Icons.person),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            SizedBox(height: 15),
+            TextFormField(
+              controller: _emailController,
+              decoration: InputDecoration(
+                labelText: 'Email',
+                prefixIcon: Icon(Icons.email),
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.emailAddress,
+            ),
+            SizedBox(height: 15),
+            TextFormField(
+              controller: _bioController,
+              decoration: InputDecoration(
+                labelText: 'Bio',
+                prefixIcon: Icon(Icons.info),
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 
 class WomenHealthPage extends StatefulWidget {
   @override
