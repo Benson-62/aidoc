@@ -3,7 +3,9 @@ import 'package:table_calendar/table_calendar.dart';
 import 'package:dialog_flowtter/dialog_flowtter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
+import 'dart:async';
 
 class AuthProvider with ChangeNotifier {
   bool _isLoggedIn = false;
@@ -104,7 +106,19 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+class HealthTip {
+  final String title;
+  final String content;
+  final String type; // 'tip' or 'news'
+  final String imageUrl;
 
+  HealthTip({
+    required this.title,
+    required this.content,
+    required this.type,
+    required this.imageUrl,
+  });
+}
 class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -194,6 +208,7 @@ class HomePage extends StatelessWidget {
       ),
     );
   }
+}
 
   Widget _buildHealthGrid(BuildContext context) {
     List<Map<String, dynamic>> features = [
@@ -283,36 +298,41 @@ class HomePage extends StatelessWidget {
   }
 
   Widget _buildQuickAccessRow(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildQuickActionCard(
-            context,
-            title: "Emergency\nContacts",
-            icon: Icons.emergency,
-            color: Colors.red,
-          ),
+  return Row(
+    children: [
+      Expanded(
+        child: _buildQuickActionCard(
+          context,
+          title: "Emergency\nContacts",
+          icon: Icons.emergency,
+          color: Colors.red,
+          page: EmergencyContactsPage(), // Add this
         ),
-        SizedBox(width: 15),
-        Expanded(
-          child: _buildQuickActionCard(
-            context,
-            title: "Medical\nRecords",
-            icon: Icons.assignment,
-            color: Colors.teal,
-          ),
+      ),
+      SizedBox(width: 15),
+      Expanded(
+        child: _buildQuickActionCard(
+          context,
+          title: "Medical\nRecords",
+          icon: Icons.assignment,
+          color: Colors.teal,
+          page: MedicalRecordsPage(), // Add this
         ),
-      ],
-    );
-  }
+      ),
+    ],
+  );
+}
 
   Widget _buildQuickActionCard(
-      BuildContext context, {required String title, required IconData icon, required Color color}) {
+      BuildContext context, {required String title, required IconData icon, required Color color,required Widget page,}) {
     return Card(
       elevation: 4,
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
-        onTap: () {},
+       onTap: () => Navigator.push( // Add navigation
+        context,
+        MaterialPageRoute(builder: (context) => page),
+      ),
         child: Container(
           height: 100,
           decoration: BoxDecoration(
@@ -338,37 +358,35 @@ class HomePage extends StatelessWidget {
     );
   }
 
-  Widget _buildHealthTipsSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.symmetric(vertical: 10),
-          child: Text("Daily Health Tips",
+Widget _buildHealthTipsSection() {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Health Tips & News',
               style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.deepPurple)),
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.deepPurple,
+              ),
+            ),
+            IconButton(
+              icon: Icon(Icons.more_horiz, color: Colors.deepPurple),
+              onPressed: () {
+                // Add navigation to full tips list if needed
+              },
+            ),
+          ],
         ),
-        // Image placeholder for health tips
-        Container(
-          height: 150,
-          decoration: BoxDecoration(
-            color: Colors.deepPurple.shade50,
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: Center(
-            child: Icon(Icons.image_search, 
-                size: 50, 
-                color: Colors.deepPurple.withOpacity(0.3)),
-          ),
-        ),
-        SizedBox(height: 10),
-        Text("Stay hydrated and maintain regular exercise routine",
-            style: TextStyle(fontStyle: FontStyle.italic)),
-      ],
-    );
-  }
+      ),
+      HealthTipsCarousel(),
+    ],
+  );
 }
 
 // Add new LoginPage class
@@ -1646,6 +1664,412 @@ class ChatInputWidget extends StatelessWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+// ========== Emergency Contacts Page ==========
+class EmergencyContactsPage extends StatelessWidget {
+  final List<Map<String, dynamic>> doctors = [
+    {'name': 'Dr. Benson B Varghese', 'specialty': 'Neurosurgeon', 'phone': '+2255113322'},
+    {'name': 'Dr. Bhavana S Nair', 'specialty': 'Psychiatrist', 'phone': '+1234567890'},
+    {'name': 'Dr. Aswin Baburaj', 'specialty': 'General Physician', 'phone': '+0987654321'},
+    {'name': 'Dr. Aadithyakrishnan K H', 'specialty': 'Pediatrician', 'phone': '+1122334455'},
+  ];
+
+  final List<Map<String, dynamic>> hospitals = [
+    {'name': 'City General Hospital', 'address': '123 Main St', 'phone': '+1555666777'},
+    {'name': 'Metro Health Center', 'address': '456 Oak Ave', 'phone': '+1888999000'},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Emergency Contacts')),
+      body: ListView(
+        padding: EdgeInsets.all(16),
+        children: [
+          _buildSectionHeader('Emergency Ambulance'),
+          _buildAmbulanceCard(),
+          SizedBox(height: 20),
+          _buildSectionHeader('Doctors'),
+          ...doctors.map((doctor) => _buildContactCard(
+            icon: Icons.medical_services,
+            title: doctor['name'],
+            subtitle: doctor['specialty'],
+            phone: doctor['phone'],
+          )),
+          SizedBox(height: 20),
+          _buildSectionHeader('Nearby Hospitals'),
+          ...hospitals.map((hospital) => _buildContactCard(
+            icon: Icons.local_hospital,
+            title: hospital['name'],
+            subtitle: hospital['address'],
+            phone: hospital['phone'],
+          )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          color: Colors.deepPurple,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAmbulanceCard() {
+    return Card(
+      elevation: 4,
+      color: Colors.red.shade50,
+      child: ListTile(
+        leading: Icon(Icons.emergency, color: Colors.red),
+        title: Text('Call Ambulance'),
+        subtitle: Text('Emergency Medical Services'),
+        trailing: IconButton(
+          icon: Icon(Icons.call, color: Colors.red),
+          onPressed: () => _makePhoneCall('911'),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContactCard({IconData? icon, String? title, String? subtitle, String? phone}) {
+    return Card(
+      elevation: 2,
+      child: ListTile(
+        leading: Icon(icon, color: Colors.deepPurple),
+        title: Text(title!),
+        subtitle: Text(subtitle!),
+        trailing: IconButton(
+          icon: Icon(Icons.call, color: Colors.green),
+          onPressed: () => _makePhoneCall(phone!),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final Uri launchUri = Uri(
+      scheme: 'tel',
+      path: phoneNumber,
+    );
+    if (await canLaunch(launchUri.toString())) {
+      await launch(launchUri.toString());
+    }
+  }
+}
+
+// ========== Medical Records Page ==========
+class MedicalRecordsPage extends StatefulWidget {
+  @override
+  _MedicalRecordsPageState createState() => _MedicalRecordsPageState();
+}
+
+class _MedicalRecordsPageState extends State<MedicalRecordsPage> {
+  List<Map<String, dynamic>> _medicalRecords = [
+    {'title': 'Blood Test Report', 'date': '2023-03-15', 'description': 'Complete blood count results'},
+    {'title': 'X-Ray Report', 'date': '2023-04-20', 'description': 'Chest X-Ray findings'},
+  ];
+
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Medical Records')),
+      floatingActionButton: FloatingActionButton(
+        child: Icon(Icons.add),
+        onPressed: () => _showAddRecordDialog(),
+        backgroundColor: Colors.deepPurple,
+      ),
+      body: ListView.builder(
+        padding: EdgeInsets.all(16),
+        itemCount: _medicalRecords.length,
+        itemBuilder: (context, index) {
+          return _buildRecordCard(_medicalRecords[index]);
+        },
+      ),
+    );
+  }
+
+  Widget _buildRecordCard(Map<String, dynamic> record) {
+    return Card(
+      elevation: 4,
+      margin: EdgeInsets.symmetric(vertical: 8),
+      child: ListTile(
+        contentPadding: EdgeInsets.all(16),
+        leading: Icon(Icons.assignment, color: Colors.deepPurple),
+        title: Text(record['title'], style: TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(record['date']),
+            SizedBox(height: 8),
+            Text(record['description']),
+          ],
+        ),
+        trailing: IconButton(
+          icon: Icon(Icons.delete, color: Colors.red),
+          onPressed: () => _deleteRecord(record),
+        ),
+      ),
+    );
+  }
+
+  void _showAddRecordDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Add New Medical Record'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _titleController,
+              decoration: InputDecoration(
+                labelText: 'Title',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            SizedBox(height: 16),
+            TextFormField(
+              controller: _descriptionController,
+              decoration: InputDecoration(
+                labelText: 'Description',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (_titleController.text.isNotEmpty) {
+                setState(() {
+                  _medicalRecords.add({
+                    'title': _titleController.text,
+                    'date': DateTime.now().toString().substring(0, 10),
+                    'description': _descriptionController.text
+                  });
+                });
+                _titleController.clear();
+                _descriptionController.clear();
+                Navigator.pop(context);
+              }
+            },
+            child: Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _deleteRecord(Map<String, dynamic> record) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete Record?'),
+        content: Text('Are you sure you want to delete this record?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() => _medicalRecords.remove(record));
+              Navigator.pop(context);
+            },
+            child: Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+class HealthTipsCarousel extends StatefulWidget {
+  @override
+  _HealthTipsCarouselState createState() => _HealthTipsCarouselState();
+}
+
+class _HealthTipsCarouselState extends State<HealthTipsCarousel> {
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
+  final List<HealthTip> _healthTips = [
+    HealthTip(
+      title: 'Stay Hydrated!',
+      content: 'Drink at least 8 glasses of water daily for optimal body function.',
+      type: 'tip',
+      imageUrl: 'https://imgs.search.brave.com/bHHIVqPho48hEBSa-Hpwk-q1rL9hKTOCh-qes7YfsIQ/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9pMC53/cC5jb20vcG9zdC5o/ZWFsdGhsaW5lLmNv/bS93cC1jb250ZW50/L3VwbG9hZHMvMjAy/MC8xMS9wb2MtYXRo/bGV0ZS1kcmlua2lu/Zy13YXRlci0xMjk2/eDcyOC1oZWFkZXIu/anBnP3c9MTE1NSZo/PTE1Mjg',
+    ),
+    HealthTip(
+      title: 'COVID-19 Update',
+      content: 'New booster vaccines now available for adults over 50.',
+      type: 'news',
+      imageUrl: 'https://imgs.search.brave.com/T3zEffTa0_u6HVb3txNLEjsBaRGHLhyWDgDccCHu7Ts/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9pbWcu/ZnJlZXBpay5jb20v/cHJlbWl1bS1waG90/by9jb3ZpZDE5LXZp/cnVzZXNfOTY3NDMt/NjAxLmpwZz9zZW10/PWFpc19oeWJyaWQ',
+    ),
+    HealthTip(
+      title: 'Daily Exercise',
+      content: '30 minutes of moderate exercise can improve heart health.',
+      type: 'tip',
+      imageUrl: 'https://imgs.search.brave.com/A8-Egitcd5oiUYlFhAFFvdLEfiqBa4Bt_yHtVYpx-v8/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly90NC5m/dGNkbi5uZXQvanBn/LzA4LzA0LzQ4LzY5/LzM2MF9GXzgwNDQ4/Njk5Ml9GNGxIUVB6/VGdjTGxBTzFIbnhk/VTZXcVFuTFBzS1ZS/WS5qcGc',
+    ),
+    HealthTip(
+      title: 'Mental Health',
+      content: 'Meditation shown to reduce stress by 40% in new study.',
+      type: 'news',
+      imageUrl: 'https://imgs.search.brave.com/e9fBKah-VPiXe-jeAMZyXcuihDHenLqjdfiIQQbya_8/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly93YWxs/cGFwZXJzLmNvbS9p/bWFnZXMvaGQvaGVh/bHRoLXBpY3R1cmVz/LXV4NnF4YW94dXl0/eXU4MnUuanBn',
+    ),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Auto-scroll every 5 seconds
+    Timer.periodic(Duration(seconds: 7), (Timer timer) {
+      if (_currentPage < _healthTips.length - 1) {
+        _currentPage++;
+      } else {
+        _currentPage = 0;
+      }
+      _pageController.animateToPage(
+        _currentPage,
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeIn,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          height: 180,
+          child: PageView.builder(
+            controller: _pageController,
+            itemCount: _healthTips.length,
+            onPageChanged: (index) {
+              setState(() => _currentPage = index);
+            },
+            itemBuilder: (context, index) {
+              return _buildTipCard(_healthTips[index]);
+            },
+          ),
+        ),
+        SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List<Widget>.generate(
+            _healthTips.length,
+            (index) => Container(
+              width: 8,
+              height: 8,
+              margin: EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _currentPage == index 
+                    ? Colors.deepPurple 
+                    : Colors.grey,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTipCard(HealthTip tip) {
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+      ),
+      elevation: 4,
+      child: Container(
+        padding: EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(15),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.deepPurple.shade50,
+              Colors.white,
+            ],
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  image: DecorationImage(
+                    image: NetworkImage(tip.imageUrl), // Use your images
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                child: tip.imageUrl.isEmpty
+                    ? Icon(Icons.health_and_safety, size: 50)
+                    : null,
+              ),
+            ),
+            SizedBox(width: 15),
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tip.type.toUpperCase(),
+                    style: TextStyle(
+                      color: tip.type == 'news' 
+                          ? Colors.red 
+                          : Colors.green,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  SizedBox(height: 5),
+                  Text(
+                    tip.title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.deepPurple,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    tip.content,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

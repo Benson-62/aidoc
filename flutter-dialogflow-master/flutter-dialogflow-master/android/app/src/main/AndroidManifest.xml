@@ -32,3 +32,9 @@
             android:value="2" />
     </application>
 </manifest>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET"/> <!-- Add this line -->
+    <application>
+        ...
+    </application>
+</manifest>
