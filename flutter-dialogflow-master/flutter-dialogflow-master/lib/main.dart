@@ -1554,14 +1554,212 @@ class DiseaseDiagnosisPage extends StatelessWidget {
 }
 
 // Mood Detection Page (unchanged)
-class MoodDetectionPage extends StatelessWidget {
+class MoodDetectionPage extends StatefulWidget {
+  @override
+  _MoodDetectionPageState createState() => _MoodDetectionPageState();
+}
+
+class _MoodDetectionPageState extends State<MoodDetectionPage> {
+  final List<String> _moodOptions = [
+    '😊 Happy',
+    '😢 Sad',
+    '😡 Angry',
+    '😴 Tired',
+    '😌 Calm',
+    '😨 Anxious',
+    '🤔 Thoughtful',
+    '😍 Excited',
+  ];
+
+  final List<String> _activities = [
+    'Work',
+    'Exercise',
+    'Socializing',
+    'Relaxing',
+    'Studying',
+    'Traveling',
+    'Eating',
+    'Sleeping',
+  ];
+
+  String? _selectedMood;
+  final List<String> _selectedActivities = [];
+  final TextEditingController _notesController = TextEditingController();
+  final Map<DateTime, Map<String, dynamic>> _moodEntries = {};
+
+  void _logMood() async {
+    if (_selectedMood == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Please select a mood before saving.")),
+      );
+      return;
+    }
+
+    final DateTime now = DateTime.now();
+    setState(() {
+      _moodEntries[now] = {
+        'mood': _selectedMood,
+        'activities': List.from(_selectedActivities),
+        'notes': _notesController.text,
+      };
+    });
+
+    // Clear the form after logging
+    _selectedMood = null;
+    _selectedActivities.clear();
+    _notesController.clear();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text("Mood logged successfully!")),
+    );
+  }
+
+  Widget _buildMoodSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("How are you feeling today?",
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: _moodOptions
+              .map((mood) => ChoiceChip(
+                    label: Text(mood),
+                    selected: _selectedMood == mood,
+                    onSelected: (selected) {
+                      setState(() {
+                        _selectedMood = selected ? mood : null;
+                      });
+                    },
+                  ))
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActivitySelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("What activities did you do today?",
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: _activities
+              .map((activity) => FilterChip(
+                    label: Text(activity),
+                    selected: _selectedActivities.contains(activity),
+                    onSelected: (selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedActivities.add(activity);
+                        } else {
+                          _selectedActivities.remove(activity);
+                        }
+                      });
+                    },
+                  ))
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNotesField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text("Notes (optional):",
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        SizedBox(height: 10),
+        TextField(
+          controller: _notesController,
+          decoration: InputDecoration(
+            hintText: "Write about your day...",
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 3,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMoodLogs() {
+    if (_moodEntries.isEmpty) {
+      return Center(
+        child: Text("No mood entries yet. Start logging your mood!",
+            style: TextStyle(fontSize: 16, color: Colors.grey)),
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: NeverScrollableScrollPhysics(),
+      itemCount: _moodEntries.length,
+      itemBuilder: (context, index) {
+        final entry = _moodEntries.entries.toList()[index];
+        final date = entry.key;
+        final data = entry.value;
+
+        return Card(
+          margin: EdgeInsets.symmetric(vertical: 5),
+          child: ListTile(
+            title: Text(data['mood'] ?? ''),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (data['activities'] != null && data['activities'].isNotEmpty)
+                  Text("Activities: ${data['activities'].join(', ')}"),
+                if (data['notes'] != null && data['notes'].isNotEmpty)
+                  Text("Notes: ${data['notes']}"),
+              ],
+            ),
+            trailing: Text(
+              "${date.day}/${date.month}/${date.year}",
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Mood Detection")),
-      body: Center(
-        child: Text("Mood Detection Feature Coming Soon...",
-            style: TextStyle(fontSize: 18, color: Colors.deepPurple)),
+      appBar: AppBar(title: Text("Mood Journal")),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildMoodSelector(),
+            SizedBox(height: 20),
+            _buildActivitySelector(),
+            SizedBox(height: 20),
+            _buildNotesField(),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _logMood,
+              child: Text("Log Mood"),
+              style: ElevatedButton.styleFrom(
+                padding: EdgeInsets.symmetric(vertical: 15),
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
+              ),
+            ),
+            SizedBox(height: 20),
+            Text("Mood History",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 10),
+            _buildMoodLogs(),
+          ],
+        ),
       ),
     );
   }
