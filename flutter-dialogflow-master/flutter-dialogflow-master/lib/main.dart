@@ -1293,7 +1293,7 @@ class _WomenHealthPageState extends State<WomenHealthPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text("Upcoming Period Dates (Next 5 months)",
+            Text("upcoming Period Dates (Next 5 months)",
                 style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
