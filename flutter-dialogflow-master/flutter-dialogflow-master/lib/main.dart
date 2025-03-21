@@ -1540,14 +1540,222 @@ class _DailyLogDialogState extends State<DailyLogDialog> {
 }
 
 // Disease Diagnosis Page (unchanged)
-class DiseaseDiagnosisPage extends StatelessWidget {
+class DiseaseDiagnosisPage extends StatefulWidget {
+  @override
+  _DiseaseDiagnosisPageState createState() => _DiseaseDiagnosisPageState();
+}
+
+class _DiseaseDiagnosisPageState extends State<DiseaseDiagnosisPage> {
+  late DialogFlowtter dialogFlowtter;
+  final TextEditingController _symptomController = TextEditingController();
+  List<Map<String, dynamic>> _diagnosisHistory = [];
+  List<String> _currentSymptoms = [];
+  Map<String, dynamic>? _currentDiagnosis;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    DialogFlowtter.fromFile().then((instance) => dialogFlowtter = instance);
+  }
+
+  Future<void> _analyzeSymptoms() async {
+    if (_symptomController.text.isEmpty) return;
+    
+    setState(() {
+      _isLoading = true;
+      _currentSymptoms.add(_symptomController.text);
+    });
+
+    try {
+      DetectIntentResponse response = await dialogFlowtter.detectIntent(
+        queryInput: QueryInput(
+          text: TextInput(text: _symptomController.text),
+        ),
+      );
+
+      if (response.message != null) {
+        final result = _parseDialogflowResponse(response);
+        setState(() {
+          _currentDiagnosis = result;
+          _diagnosisHistory.insert(0, {
+            'symptoms': List.from(_currentSymptoms),
+            'diagnosis': result,
+            'date': DateTime.now().toIso8601String()
+          });
+          _currentSymptoms.clear();
+        });
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+        _symptomController.clear();
+      });
+    }
+  }
+
+  Map<String, dynamic> _parseDialogflowResponse(DetectIntentResponse response) {
+    // Parse Dialogflow response into structured data
+    final parameters = response.queryResult?.parameters ?? {};
+    return {
+      'conditions': (parameters['conditions'] ?? []).map((c) => c['name']).toList(),
+      'confidence': parameters['confidence']?.toString() ?? 'N/A',
+      'triage': parameters['triage'] ?? 'Consult doctor',
+      'recommendations': (parameters['recommendations'] ?? []).join('\n'),
+      'follow_up_questions': (parameters['follow-up'] ?? []),
+    };
+  }
+
+  Widget _buildSymptomInput() {
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Describe your symptoms:',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 10),
+            TextField(
+              controller: _symptomController,
+              decoration: InputDecoration(
+                hintText: 'e.g. headache, fever, nausea...',
+                suffixIcon: IconButton(
+                  icon: Icon(Icons.send),
+                  onPressed: _analyzeSymptoms,
+                ),
+                border: OutlineInputBorder(),
+              ),
+              onSubmitted: (_) => _analyzeSymptoms(),
+            ),
+            if (_isLoading) LinearProgressIndicator(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDiagnosisResult() {
+    if (_currentDiagnosis == null) return SizedBox();
+
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Assessment Results',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            SizedBox(height: 15),
+            _buildResultItem('Possible Conditions',
+                _currentDiagnosis!['conditions'].join(', ')),
+            _buildResultItem('Confidence Level', _currentDiagnosis!['confidence']),
+            _buildResultItem('Recommended Action', _currentDiagnosis!['triage']),
+            SizedBox(height: 10),
+            Text('Recommendations:',
+                style: TextStyle(fontWeight: FontWeight.bold)),
+            SizedBox(height: 5),
+            Text(_currentDiagnosis!['recommendations']),
+            if (_currentDiagnosis!['follow_up_questions'].isNotEmpty) ...[
+              SizedBox(height: 15),
+              Text('Follow-up Questions:',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              ..._currentDiagnosis!['follow_up_questions'].map<Widget>((q) => ListTile(
+                leading: Icon(Icons.question_answer),
+                title: Text(q),
+                onTap: () {
+                  _symptomController.text = q;
+                  _analyzeSymptoms();
+                },
+              )).toList(),
+            ]
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResultItem(String title, String value) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(value),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryList() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: 8),
+          child: Text('History',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        ),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: NeverScrollableScrollPhysics(),
+          itemCount: _diagnosisHistory.length,
+          itemBuilder: (context, index) {
+            final entry = _diagnosisHistory[index];
+            return Card(
+              elevation: 2,
+              child: ListTile(
+                title: Text(entry['diagnosis']['conditions'].join(', ')),
+                subtitle: Text(entry['date'].substring(0, 10)),
+                trailing: Icon(Icons.medical_services),
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: Text('Diagnosis Details'),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Symptoms: ${entry['symptoms'].join(', ')}'),
+                          SizedBox(height: 10),
+                          Text('Conditions: ${entry['diagnosis']['conditions'].join(', ')}'),
+                          Text('Recommendations: ${entry['diagnosis']['recommendations']}'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text("Disease Diagnosis")),
-      body: Center(
-        child: Text("Disease Diagnosis Feature Coming Soon...",
-            style: TextStyle(fontSize: 18, color: Colors.deepPurple)),
+      appBar: AppBar(title: Text("Symptom Checker")),
+      body: SingleChildScrollView(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          children: [
+            _buildSymptomInput(),
+            SizedBox(height: 20),
+            _buildDiagnosisResult(),
+            SizedBox(height: 20),
+            _buildHistoryList(),
+          ],
+        ),
       ),
     );
   }
