@@ -80,6 +80,7 @@ class MyApp extends StatelessWidget {
       builder: (context, themeProvider, _) {
         return MaterialApp(
           title: 'Medbot',
+          debugShowCheckedModeBanner: false,
           theme: ThemeData.light().copyWith(
             primaryColor: Colors.deepPurple,
             colorScheme: ColorScheme.fromSwatch(
@@ -143,8 +144,8 @@ class HomePage extends StatelessWidget {
               SizedBox(height: 30),
               _buildHealthGrid(context),
               SizedBox(height: 20),
-              _buildQuickAccessRow(context),
-              SizedBox(height: 20),
+              // _buildQuickAccessRow(context),
+              // SizedBox(height: 20),
               _buildHealthTipsSection(),
             ],
           ),
@@ -210,153 +211,140 @@ class HomePage extends StatelessWidget {
   }
 }
 
-  Widget _buildHealthGrid(BuildContext context) {
-    List<Map<String, dynamic>> features = [
-      {
-        "title": "Symptom Checker",
-        "icon": Icons.health_and_safety,
-        "color": Colors.orange,
-        "page": DiseaseDiagnosisPage()
-      },
-      {
-        "title": "Cycle Tracker",
-        "icon": Icons.female,
-        "color": Colors.pink,
-        "page": WomenHealthPage()
-      },
-      {
-        "title": "Mood Journal",
-        "icon": Icons.emoji_emotions,
-        "color": Colors.blue,
-        "page": MoodDetectionPage()
-      },
-      {
-        "title": "Medication",
-        "icon": Icons.medical_services,
-        "color": Colors.green,
-        "page": ChatBotPage()
-      },
-    ];
+Widget _buildHealthGrid(BuildContext context) {
+  List<Map<String, dynamic>> features = [
+    {
+      "title": "Symptom Checker",
+      "icon": Icons.health_and_safety,
+      "color": Colors.orange,
+      "page": DiseaseDiagnosisPage()
+    },
+    {
+      "title": "Cycle Tracker",
+      "icon": Icons.female,
+      "color": Colors.pink,
+      "page": WomenHealthPage()
+    },
+    {
+      "title": "Mood Journal",
+      "icon": Icons.emoji_emotions,
+      "color": Colors.blue,
+      "page": MoodDetectionPage()
+    },
+    {
+      "title": "Medication",
+      "icon": Icons.medical_services,
+      "color": Colors.green,
+      "page": ChatBotPage()
+    },
+    {
+      "title": "Emergency\nContacts",
+      "icon": Icons.emergency,
+      "color": Colors.red,
+      "page": EmergencyContactsPage()
+    },
+    {
+      "title": "Medical\nRecords",
+      "icon": Icons.assignment,
+      "color": Colors.teal,
+      "page": MedicalRecordsPage()
+    },
+  ];
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 1.0,
-      ),
-      itemCount: features.length,
-      itemBuilder: (context, index) => _buildFeatureCard(features[index], context),
-    );
-  }
-
-  Widget _buildFeatureCard(Map<String, dynamic> feature, BuildContext context) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => Navigator.push(
-            context, MaterialPageRoute(builder: (context) => feature["page"])),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: LinearGradient(
-              colors: [feature["color"].withOpacity(0.1), Colors.white],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-          ),
-          child: Padding(
-            padding: EdgeInsets.all(8),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Icon(feature["icon"], size: 30, color: feature["color"]),
-                Text(feature["title"],
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.deepPurple)),
-                // Image placeholder
-                Container(
-                  height: 60,
-                  decoration: BoxDecoration(
-                    color: feature["color"].withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.image,size: 30, color: feature["color"].withOpacity(0.4)),
-                )
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickAccessRow(BuildContext context) {
-  return Row(
-    children: [
-      Expanded(
-        child: _buildQuickActionCard(
-          context,
-          title: "Emergency\nContacts",
-          icon: Icons.emergency,
-          color: Colors.red,
-          page: EmergencyContactsPage(), // Add this
-        ),
-      ),
-      SizedBox(width: 15),
-      Expanded(
-        child: _buildQuickActionCard(
-          context,
-          title: "Medical\nRecords",
-          icon: Icons.assignment,
-          color: Colors.teal,
-          page: MedicalRecordsPage(), // Add this
-        ),
-      ),
-    ],
+  return GridView.builder(
+    shrinkWrap: true,
+    physics: NeverScrollableScrollPhysics(),
+    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+      crossAxisCount: 3, // 3 items per row
+      crossAxisSpacing: 8, // Spacing between columns
+      mainAxisSpacing: 8, // Spacing between rows
+      childAspectRatio: 2.0, // Adjusted to make the cards square
+    ),
+    itemCount: features.length,
+    itemBuilder: (context, index) => _buildFeatureCard(features[index], context),
   );
 }
 
-  Widget _buildQuickActionCard(
-      BuildContext context, {required String title, required IconData icon, required Color color,required Widget page,}) {
-    return Card(
-      elevation: 4,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-       onTap: () => Navigator.push( // Add navigation
-        context,
-        MaterialPageRoute(builder: (context) => page),
-      ),
-        child: Container(
-          height: 100,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(10),
+Widget _buildFeatureCard(Map<String, dynamic> feature, BuildContext context) {
+  return Card(
+    elevation: 2, // Reduced elevation for a flatter look
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () => Navigator.push(
+        context, MaterialPageRoute(builder: (context) => feature["page"])),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            colors: [feature["color"].withOpacity(0.1), Colors.white],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
-          padding: EdgeInsets.all(12),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(8), // Adjusted padding to match the screenshot
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center, // Centered content
             children: [
-              Icon(icon, size: 30, color: color),
-              SizedBox(height: 6),
-              Text(title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: color)),
+              Icon(
+                feature["icon"],
+                size: 30, // Keep the icon size the same
+                color: feature["color"],
+              ),
+              SizedBox(height: 8), // Adjusted spacing between icon and text
+              Text(
+                feature["title"],
+                style: TextStyle(
+                  fontSize: 13, // Keep the font size the same
+                  fontWeight: FontWeight.bold,
+                  color: Colors.deepPurple,
+                ),
+                textAlign: TextAlign.center, // Centered text
+              ),
             ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+  // Widget _buildQuickActionCard(
+  //     BuildContext context, {required String title, required IconData icon, required Color color,required Widget page,}) {
+  //   return Card(
+  //     elevation: 4,
+  //     child: InkWell(
+  //       borderRadius: BorderRadius.circular(10),
+  //      onTap: () => Navigator.push( // Add navigation
+  //       context,
+  //       MaterialPageRoute(builder: (context) => page),
+  //     ),
+  //       child: Container(
+  //         height: 100,
+  //         decoration: BoxDecoration(
+  //           color: color.withOpacity(0.1),
+  //           borderRadius: BorderRadius.circular(10),
+  //         ),
+  //         padding: EdgeInsets.all(12),
+  //         child: Column(
+  //           mainAxisAlignment: MainAxisAlignment.center,
+  //           children: [
+  //             Icon(icon, size: 30, color: color),
+  //             SizedBox(height: 6),
+  //             Text(title,
+  //                 textAlign: TextAlign.center,
+  //                 style: TextStyle(
+  //                   fontSize: 13,
+  //                     fontWeight: FontWeight.bold,
+  //                     color: color)),
+  //           ],
+  //         ),
+  //       ),
+  //     ),
+  //   );
+  // }
 
 Widget _buildHealthTipsSection() {
   return Column(
