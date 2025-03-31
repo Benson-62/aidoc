@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import 'dart:async';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+
 
 class AuthProvider with ChangeNotifier {
   bool _isLoggedIn = false;
@@ -1540,11 +1542,168 @@ class _DiseaseDiagnosisPageState extends State<DiseaseDiagnosisPage> {
   List<String> _currentSymptoms = [];
   Map<String, dynamic>? _currentDiagnosis;
   bool _isLoading = false;
+  bool _showWebView = false;
+  late InAppWebViewController _webViewController;
+  double _progress = 0;
 
   @override
   void initState() {
     super.initState();
     DialogFlowtter.fromFile().then((instance) => dialogFlowtter = instance);
+  }
+
+  @override
+  void dispose() {
+    _symptomController.dispose();
+    dialogFlowtter.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_showWebView ? "Symptom Checker" : "Symptom Checker"),
+        actions: _showWebView
+            ? [
+                IconButton(
+                  icon: Icon(Icons.close),
+                  onPressed: () => setState(() => _showWebView = false),
+                ),
+              ]
+            : [
+                IconButton(
+                  icon: Icon(Icons.history),
+                  onPressed: _showHistoryDialog,
+                ),
+              ],
+      ),
+      body: _showWebView ? _buildWebMDView() : _buildMainContent(),
+    );
+  }
+
+  Widget _buildMainContent() {
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(16),
+      child: Column(
+        children: [
+          // WebMD Button Card
+          Card(
+            elevation: 4,
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Text(
+                    "Check Your Symptoms",
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () => setState(() => _showWebView = true),
+                    child: Text("Use WebMD Symptom Checker"),
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 15),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: 20),
+          
+          // DialogFlow Symptom Input
+          _buildSymptomInput(),
+          SizedBox(height: 20),
+          
+          // Current Diagnosis Results
+          if (_currentDiagnosis != null) _buildDiagnosisResult(),
+          SizedBox(height: 20),
+          
+          // History Preview
+          _buildHistoryPreview(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWebMDView() {
+    return Column(
+      children: [
+        LinearProgressIndicator(
+          value: _progress,
+          backgroundColor: Colors.grey[200],
+        ),
+        Expanded(
+          child: InAppWebView(
+            initialUrlRequest: URLRequest(url: WebUri("https://symptoms.webmd.com/")),
+            initialOptions: InAppWebViewGroupOptions(
+              crossPlatform: InAppWebViewOptions(
+                transparentBackground: true,
+                javaScriptEnabled: true,
+              ),
+            ),
+            onWebViewCreated: (controller) {
+              _webViewController = controller;
+            },
+            onProgressChanged: (controller, progress) {
+              setState(() => _progress = progress / 100);
+            },
+            onLoadStop: (controller, url) async {
+              await controller.evaluateJavascript(source: """
+                // Remove all headers, footers, and navigation
+                document.querySelector('header')?.remove();
+                document.querySelector('nav')?.remove();
+                document.querySelector('.global-header')?.remove();
+                document.querySelector('footer')?.remove();
+                document.querySelector('.footer')?.remove();
+                document.querySelector('.disclaimer')?.remove();
+                
+                // Remove ads and other unwanted elements
+                document.querySelectorAll('.ad-container, .ad-banner, .ad-unit').forEach(el => el.remove());
+                document.querySelectorAll('[data-qa="global_nav"], .GlobalNavigation, .SiteHeader').forEach(el => el.remove());
+                
+                // Make body non-scrollable and full height
+                document.body.style.overflow = 'hidden';
+                document.body.style.height = '100%';
+                document.body.style.margin = '0';
+                document.body.style.padding = '0';
+                
+                // Find the symptom checker container
+                const symptomChecker = document.querySelector('.symptom-checker-container') || 
+                                      document.querySelector('#symptom-checker') || 
+                                      document.querySelector('.symptom-checker');
+                
+                if (symptomChecker) {
+                  // Remove all siblings
+                  while (symptomChecker.parentNode.childNodes.length > 1) {
+                    if (symptomChecker.previousSibling) {
+                      symptomChecker.parentNode.removeChild(symptomChecker.previousSibling);
+                    } else if (symptomChecker.nextSibling) {
+                      symptomChecker.parentNode.removeChild(symptomChecker.nextSibling);
+                    }
+                  }
+                  
+                  // Apply zoom and center the content
+                  symptomChecker.style.transform = 'scale(1.2)';
+                  symptomChecker.style.transformOrigin = 'top center';
+                  symptomChecker.style.width = '100%';
+                  symptomChecker.style.margin = '0 auto';
+                  symptomChecker.style.padding = '0';
+                }
+                
+                // Remove any remaining scrollable containers
+                document.querySelectorAll('*[style*="overflow:scroll"], *[style*="overflow:auto"]')
+                  .forEach(el => el.style.overflow = 'hidden');
+              """);
+            },
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _analyzeSymptoms() async {
@@ -1583,7 +1742,6 @@ class _DiseaseDiagnosisPageState extends State<DiseaseDiagnosisPage> {
   }
 
   Map<String, dynamic> _parseDialogflowResponse(DetectIntentResponse response) {
-    // Parse Dialogflow response into structured data
     final parameters = response.queryResult?.parameters ?? {};
     return {
       'conditions': (parameters['conditions'] ?? []).map((c) => c['name']).toList(),
@@ -1625,8 +1783,6 @@ class _DiseaseDiagnosisPageState extends State<DiseaseDiagnosisPage> {
   }
 
   Widget _buildDiagnosisResult() {
-    if (_currentDiagnosis == null) return SizedBox();
-
     return Card(
       elevation: 4,
       child: Padding(
@@ -1665,85 +1821,93 @@ class _DiseaseDiagnosisPageState extends State<DiseaseDiagnosisPage> {
     );
   }
 
-  Widget _buildResultItem(String title, String value) {
+  Widget _buildResultItem(String label, String value) {
     return Padding(
       padding: EdgeInsets.symmetric(vertical: 8),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            flex: 2,
-            child: Text(title, style: TextStyle(fontWeight: FontWeight.bold)),
+          Text('$label: ',
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(value)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryPreview() {
+    if (_diagnosisHistory.isEmpty) return SizedBox();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Recent Checks",
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        SizedBox(height: 10),
+        ..._diagnosisHistory.take(2).map((entry) => Card(
+          child: ListTile(
+            title: Text(entry['diagnosis']['conditions'].join(', ')),
+            subtitle: Text(entry['date'].substring(0, 10)),
+            onTap: () => _showDiagnosisDetails(context, entry),
           ),
-          Expanded(
-            flex: 3,
-            child: Text(value),
+        )),
+      ],
+    );
+  }
+
+  void _showHistoryDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Diagnosis History"),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: _diagnosisHistory.length,
+            itemBuilder: (context, index) => ListTile(
+              title: Text(_diagnosisHistory[index]['diagnosis']['conditions'].join(', ')),
+              subtitle: Text(_diagnosisHistory[index]['date'].substring(0, 10)),
+              onTap: () => _showDiagnosisDetails(context, _diagnosisHistory[index]),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Close"),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildHistoryList() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: Text('History',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        ),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: NeverScrollableScrollPhysics(),
-          itemCount: _diagnosisHistory.length,
-          itemBuilder: (context, index) {
-            final entry = _diagnosisHistory[index];
-            return Card(
-              elevation: 2,
-              child: ListTile(
-                title: Text(entry['diagnosis']['conditions'].join(', ')),
-                subtitle: Text(entry['date'].substring(0, 10)),
-                trailing: Icon(Icons.medical_services),
-                onTap: () => showDialog(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    title: Text('Diagnosis Details'),
-                    content: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Symptoms: ${entry['symptoms'].join(', ')}'),
-                          SizedBox(height: 10),
-                          Text('Conditions: ${entry['diagnosis']['conditions'].join(', ')}'),
-                          Text('Recommendations: ${entry['diagnosis']['recommendations']}'),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text("Symptom Checker")),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
+  void _showDiagnosisDetails(BuildContext context, Map<String, dynamic> entry) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Diagnosis Details"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildSymptomInput(),
-            SizedBox(height: 20),
-            _buildDiagnosisResult(),
-            SizedBox(height: 20),
-            _buildHistoryList(),
+            Text("Symptoms: ${entry['symptoms'].join(', ')}"),
+            SizedBox(height: 10),
+            Text("Conditions: ${entry['diagnosis']['conditions'].join(', ')}"),
+            SizedBox(height: 10),
+            Text("Confidence: ${entry['diagnosis']['confidence']}"),
+            SizedBox(height: 10),
+            Text("Recommendations: ${entry['diagnosis']['recommendations']}"),
           ],
         ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Close"),
+          ),
+        ],
       ),
     );
   }
@@ -2067,7 +2231,7 @@ class EmergencyContactsPage extends StatelessWidget {
   final List<Map<String, dynamic>> doctors = [
     {'name': 'Dr. Benson B Varghese', 'specialty': 'Neurosurgeon', 'phone': '+2255113322'},
     {'name': 'Dr. Bhavana S Nair', 'specialty': 'Psychiatrist', 'phone': '+1234567890'},
-    {'name': 'Dr. Aswin Baburaj', 'specialty': 'General Physician', 'phone': '+0987654321'},
+    {'name': 'Dr. Aswin Baburaj', 'specialty': 'Oncologist', 'phone': '+0987654321'},
     {'name': 'Dr. Aadithyakrishnan K H', 'specialty': 'Pediatrician', 'phone': '+1122334455'},
   ];
 
